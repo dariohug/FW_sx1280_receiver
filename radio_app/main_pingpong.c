@@ -21,6 +21,7 @@
  
 /* Includes ------------------------------------------------------------------*/
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include "main.h"
@@ -158,6 +159,7 @@ uint8_t BufferSize = BUFFER_SIZE;
  * \brief The buffer
  */
 uint8_t Buffer[BUFFER_SIZE];
+uint8_t prevBuffer[BUFFER_SIZE];
 
 /*!
  * \brief Mask of IRQs to listen to in rx mode
@@ -310,52 +312,69 @@ int pingpong_main( void )
 
     AppState = APP_LOWPOWER;
 
-    // printf("DARIO: start loop\r\n");
+    printf("DARIO: start loop\r\n");
 
-    // #ifdef sender
+    #ifdef sender
 
-    // Radio.SetTx( ( TickTime_t ) { TX_TIMEOUT_VALUE } );
+    Radio.SetTx( ( TickTime_t ) { TX_TIMEOUT_VALUE } );
 
 
-    // while (1) {
+    while (1) {
         
 
-    //     memcpy( Buffer, PingMsg, PINGPONGSIZE );
+        memcpy( Buffer, PingMsg, PINGPONGSIZE );
 
-    //     Radio.SetDioIrqParams( TxIrqMask, TxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
-    //     Radio.SendPayload( Buffer, BufferSize, ( TickTime_t ){ RX_TIMEOUT_TICK_SIZE, TX_TIMEOUT_VALUE } );
-    //     printf("DARIO: Buffer content: ");
-    //     for (uint8_t i = 0; i < BufferSize; i++) {
-    //         printf("%02X ", Buffer[i]);
-    //     }
-    //     printf("\r\n");
+        Radio.SetDioIrqParams( TxIrqMask, TxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
+        Radio.SendPayload( Buffer, BufferSize, ( TickTime_t ){ RX_TIMEOUT_TICK_SIZE, TX_TIMEOUT_VALUE } );
+        printf("DARIO: Buffer content: ");
+        for (uint8_t i = 0; i < BufferSize; i++) {
+            printf("%02X ", Buffer[i]);
+        }
+        printf("\r\n");
 
-    //     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-    //     HAL_Delay(500); 
-    //     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-    //     HAL_Delay(1000);
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+        HAL_Delay(500); 
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+        HAL_Delay(1000);
 
-    // }
-    // #endif 
-    // #ifndef sender 
+    }
+    #endif 
+    #ifndef sender 
 
-    // Radio.SetRx( ( TickTime_t ) { RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
+    Radio.SetRx( ( TickTime_t ) { RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
 
-    // while (1) {
+    int8_t rssi = 0;
     
-    //     memset(Buffer, 0, BufferSize);
-    //     Radio.GetPayload( Buffer, &BufferSize, BUFFER_SIZE );
-    //     SX1280GetPacketStatus(&packetStatus);
+    uint32_t lastCounter = 0;
+    uint32_t currentCounter = 0;
+    uint32_t lostPackets = 0;
+    bool firstPacket = true;
 
-    //     printf("DARIO: Received buffer: ");
-    //     for (uint8_t i = 0; i < BufferSize; i++) {
-    //         printf("%02X ", Buffer[i]);
-    //     }
-    //     printf("\r\n");
-    //     Radio.SetRx( ( TickTime_t ) { RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
-    //     HAL_Delay(1000);
-    // }
-    // #endif
+
+    while (1) {
+    
+        memset(Buffer, 0, BufferSize);
+        Radio.GetPayload( Buffer, &BufferSize, BUFFER_SIZE );
+        Radio.GetPacketStatus(&packetStatus);
+
+        rssi = Radio.GetRssiInst();
+
+        if ( memcmp(prevBuffer, Buffer, BufferSize) != 0 ) {
+            HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+            memcpy(prevBuffer, Buffer, BufferSize);
+            
+            printf("DARIO: Received buffer: ");
+            for (uint8_t i = 0; i < BufferSize; i++) {
+                printf("%02X ", Buffer[i]);
+            }
+            printf("With RSSI: %i", rssi);
+            
+            printf("\r\n");
+        } 
+        Radio.SetRx( ( TickTime_t ) { RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
+        HAL_Delay(100);
+    }
+    #endif
 
     if( isMaster == true )
     {
