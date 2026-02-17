@@ -288,7 +288,7 @@ int pingpong_main( void )
     Radio.SetBufferBaseAddresses( 0x00, 0x00 );
     Radio.SetTxParams( TX_OUTPUT_POWER, RADIO_RAMP_02_US );
     
-    SX1280SetPollingMode( );
+    // SX1280SetPollingMode( );
 
     #if defined( MODE_BLE )
         // only used in GENERIC and BLE mode
@@ -310,56 +310,77 @@ int pingpong_main( void )
 
     AppState = APP_LOWPOWER;
 
-    printf("DARIO: start loop\r\n");
+    // printf("DARIO: start loop\r\n");
 
-    #ifdef sender
+    // #ifdef sender
 
-    Radio.SetTx( ( TickTime_t ) { TX_TIMEOUT_VALUE } );
+    // Radio.SetTx( ( TickTime_t ) { TX_TIMEOUT_VALUE } );
 
 
-    while (1) {
+    // while (1) {
         
+
+    //     memcpy( Buffer, PingMsg, PINGPONGSIZE );
+
+    //     Radio.SetDioIrqParams( TxIrqMask, TxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
+    //     Radio.SendPayload( Buffer, BufferSize, ( TickTime_t ){ RX_TIMEOUT_TICK_SIZE, TX_TIMEOUT_VALUE } );
+    //     printf("DARIO: Buffer content: ");
+    //     for (uint8_t i = 0; i < BufferSize; i++) {
+    //         printf("%02X ", Buffer[i]);
+    //     }
+    //     printf("\r\n");
+
+    //     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+    //     HAL_Delay(500); 
+    //     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+    //     HAL_Delay(1000);
+
+    // }
+    // #endif 
+    // #ifndef sender 
+
+    // Radio.SetRx( ( TickTime_t ) { RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
+
+    // while (1) {
+    
+    //     memset(Buffer, 0, BufferSize);
+    //     Radio.GetPayload( Buffer, &BufferSize, BUFFER_SIZE );
+    //     SX1280GetPacketStatus(&packetStatus);
+
+    //     printf("DARIO: Received buffer: ");
+    //     for (uint8_t i = 0; i < BufferSize; i++) {
+    //         printf("%02X ", Buffer[i]);
+    //     }
+    //     printf("\r\n");
+    //     Radio.SetRx( ( TickTime_t ) { RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
+    //     HAL_Delay(1000);
+    // }
+    // #endif
+
+    if( isMaster == true )
+    {
+        printf("Starting as Master\r\n");
 
         memcpy( Buffer, PingMsg, PINGPONGSIZE );
 
         Radio.SetDioIrqParams( TxIrqMask, TxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
-        Radio.SendPayload( Buffer, BufferSize, ( TickTime_t ){ RX_TIMEOUT_TICK_SIZE, TX_TIMEOUT_VALUE } );
-        printf("DARIO: Buffer content: ");
-        for (uint8_t i = 0; i < BufferSize; i++) {
-            printf("%02X ", Buffer[i]);
-        }
-        printf("\r\n");
-
-        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-        HAL_Delay(500); 
-        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-        HAL_Delay(1000);
-
+        Radio.SendPayload( Buffer, PINGPONGSIZE,
+            (TickTime_t){ RX_TIMEOUT_TICK_SIZE, TX_TIMEOUT_VALUE } );
     }
-    #endif 
-    #ifndef sender 
+    else
+    {
+        printf("Starting as Slave\r\n");
 
-    Radio.SetRx( ( TickTime_t ) { RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
-
-    while (1) {
-        Radio.GetPayload( Buffer, &BufferSize, BUFFER_SIZE );
-        SX1280GetPacketStatus(&packetStatus);
-
-        printf("DARIO: Received buffer: ");
-        for (uint8_t i = 0; i < BufferSize; i++) {
-            printf("%02X ", Buffer[i]);
-        }
-        printf("\r\n");
-
-        HAL_Delay(1000);
+        Radio.SetDioIrqParams( RxIrqMask, RxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
+        Radio.SetRx( (TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
     }
-    #endif
 
     while( 1 )
     {
         SX1280ProcessIrqs( );
 
-        printf("DARIO: Appstate = %d\n\r", AppState);
+        // printf("DARIO: Appstate = %d\n\r", AppState);
+        HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
         
         switch( AppState )
         {
