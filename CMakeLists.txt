@@ -64,7 +64,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    radio_app/main_pingpong.c
+    # radio_app/main_pingpong.c
+    radio_app/dario_test.c
 )
 
 # Add include paths

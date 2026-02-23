@@ -15,7 +15,10 @@ Maintainer: Miguel Luis, Matthieu Verdy and Benjamin Boulet
 */
 #include "hw.h"
 #include "sx1280-hal.h"
+#include "main.h"
 #include "radio.h"
+#include "stm32l4xx.h"
+#include "stm32l4xx_hal_gpio.h"
 #include <string.h>
 
 /*!
@@ -118,7 +121,10 @@ static uint8_t halRxBuffer[MAX_HAL_BUFFER_SIZE] = {0x00};
  */
 void SX1280HalWaitOnBusy( void )
 {
-    while( HAL_GPIO_ReadPin( RADIO_BUSY_GPIO_Port, RADIO_BUSY_Pin ) == 1 );
+    while( HAL_GPIO_ReadPin( RADIO_BUSY_GPIO_Port, RADIO_BUSY_Pin ) == 1 ){
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1); 
+    }
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0); 
 }
 
 void SX1280HalInit( DioIrqHandler **irqHandlers )

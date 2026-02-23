@@ -128,7 +128,8 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   printf("DARIO: start pingpong task\r\n");
-  pingpong_main(); 
+  // pingpong_main(); 
+  dario_main();
 
   while (1)
   {
