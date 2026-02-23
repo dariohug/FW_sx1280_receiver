@@ -184,7 +184,7 @@ int dario_main( void )
 
     printf( "\nPing Pong running in LORA mode\n\r" );
     modulationParams.PacketType = PACKET_TYPE_LORA;
-    modulationParams.Params.LoRa.SpreadingFactor = LORA_SF12;
+    modulationParams.Params.LoRa.SpreadingFactor = LORA_SF5;
     modulationParams.Params.LoRa.Bandwidth = LORA_BW_1600;
     modulationParams.Params.LoRa.CodingRate = LORA_CR_LI_4_7;
 
@@ -194,6 +194,9 @@ int dario_main( void )
     packetParams.Params.LoRa.PayloadLength = BUFFER_SIZE;
     packetParams.Params.LoRa.CrcMode = LORA_CRC_ON;
     packetParams.Params.LoRa.InvertIQ = LORA_IQ_NORMAL;
+
+    char *modeString = "Mode: LORA ";
+
 
 #elif defined( MODE_FLRC )
 
@@ -244,6 +247,8 @@ int dario_main( void )
 
             Radio.GetPayload(Buffer, &BufferSize, BUFFER_SIZE);
             rssi = Radio.GetRssiInst();
+
+            printf(modeString);
             
             printf("RX (%d bytes): ", BufferSize);
             for(int i=0; i<BufferSize; i++) {
@@ -257,9 +262,11 @@ int dario_main( void )
         else if(AppState == APP_RX_TIMEOUT || AppState == APP_RX_ERROR)
         {
             AppState = APP_LOWPOWER;
-            Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+            printf("Error or timeout occured!\r\n");
+            // Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
         }
-        HAL_Delay(5);
+        HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin);
+        HAL_Delay(100);
     }
 }
 
@@ -288,6 +295,8 @@ void OnRxTimeout( void )
 void OnRxError( IrqErrorCode_t errorCode )
 {
     AppState = APP_RX_ERROR;
+    Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+
     printf( "RXE<>>>>>>>>\n\r" ); 
 }
 
