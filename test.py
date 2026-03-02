@@ -7,9 +7,11 @@ from datetime import datetime
 # ---------------- CONFIG ----------------
 PORT = "/dev/ttyACM0"
 BAUD = 115200
-DURATION = 300   # 5 minutes
+DURATION = 30   # 5 minutes
 
-RAW_FILE = "radio_raw.csv"
+distance = input("Enter measurement distance (meters): ")
+
+RAW_FILE = f"radio_raw_{distance}.csv"
 SUMMARY_FILE = "radio_summary.csv"
 
 pattern = re.compile(
@@ -17,8 +19,6 @@ pattern = re.compile(
 )
 
 ser = serial.Serial(PORT, BAUD, timeout=1)
-
-distance = input("Enter measurement distance (meters): ")
 
 start_time = time.time()
 
