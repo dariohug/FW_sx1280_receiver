@@ -433,11 +433,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : RADIO_BUSY_Pin IN_SENDER_Pin */
-  GPIO_InitStruct.Pin = RADIO_BUSY_Pin|IN_SENDER_Pin;
+  /*Configure GPIO pin : RADIO_BUSY_Pin */
+  GPIO_InitStruct.Pin = RADIO_BUSY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  HAL_GPIO_Init(RADIO_BUSY_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : IN_SENDER_Pin */
+  GPIO_InitStruct.Pin = IN_SENDER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(IN_SENDER_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB4 */
   GPIO_InitStruct.Pin = GPIO_PIN_4;

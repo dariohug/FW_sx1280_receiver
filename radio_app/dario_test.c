@@ -163,7 +163,6 @@ int dario_main( void )
     } else {
         mode = MODE_RECEIVER;
         printf("Starting as Receiver!\r\n");
-
     }
 
     ModulationParams_t modulationParams;
@@ -277,7 +276,7 @@ int dario_main( void )
                 txStartTime = HAL_GetTick();
                 Radio.SendPayload(Buffer, BufferSize, (TickTime_t){ TX_TIMEOUT_VALUE });
             }
-            // HAL_Delay(100);
+            HAL_Delay(100);
         }
 
     } else if (mode == MODE_RECEIVER) {
@@ -288,38 +287,47 @@ int dario_main( void )
         int8_t rssi = 0;
         
 
-        while (1)
-        {
-            SX1280ProcessIrqs();
-            
-            if(AppState == APP_RX)
-            {
-                AppState = APP_LOWPOWER; 
+    while(1)
+    {
+        SX1280ProcessIrqs();
 
+        switch(AppState)
+        {
+            case APP_RX:
                 Radio.GetPayload(Buffer, &BufferSize, BUFFER_SIZE);
                 rssi = Radio.GetRssiInst();
-
-                printf(modeString);
                 
-                printf("RX (%d bytes): ", BufferSize);
-                for(int i=0; i<BufferSize; i++) {
+                printf("DARIO: Received buffer: ");
+                for (uint8_t i = 0; i < BufferSize; i++) {
                     printf("%02X ", Buffer[i]);
                 }
-                printf(" With RSSI: %i", rssi);
+                printf("With RSSI: %i", rssi);
+                
                 printf("\r\n");
                 
                 Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
-            }
-            else if(AppState == APP_RX_TIMEOUT || AppState == APP_RX_ERROR)
-            {
                 AppState = APP_LOWPOWER;
-                printf("Error or timeout occured!\r\n");
-            }
-            HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin);
-            HAL_Delay(100);
-        }
-    }   
+                break;
 
+            case APP_RX_TIMEOUT:
+                printf("RX Timeout occurred!\n");
+                Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+                AppState = APP_LOWPOWER;
+                break;
+
+            case APP_RX_ERROR:
+                printf("RX Error occurred!\n");
+                Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+                AppState = APP_LOWPOWER;
+                break;
+
+            default:
+                break;
+        }
+
+        HAL_Delay(10);
+        }
+    } 
 }
 
 void OnTxDone( void )
@@ -342,13 +350,13 @@ void OnTxTimeout( void )
 void OnRxTimeout( void )
 {
     AppState = APP_RX_TIMEOUT;
-    Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+    // Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
 }
 
 void OnRxError( IrqErrorCode_t errorCode )
 {
     AppState = APP_RX_ERROR;
-    Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+    // Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
 
     printf( "RXE<>>>>>>>>\n\r" ); 
 }
