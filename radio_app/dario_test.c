@@ -20,9 +20,6 @@
 //#define MODE_GFSK
 //#define MODE_FLRC
 
-// #define sender
-
-
 #define RF_BL_ADV_CHANNEL_38             			2426000000 // Hz
 #define RF_BL_ADV_CHANNEL_0                     	2404000000 // Hz
 
@@ -77,6 +74,8 @@ typedef enum
     APP_TX_TIMEOUT,
 }AppStates_t;
 
+volatile uint32_t txStartTime = 0;
+volatile uint32_t txEndTime = 0;
 
 /*!
  * \brief Function to be executed on Radio Tx Done event
@@ -151,6 +150,22 @@ PacketStatus_t packetStatus;
 
 int dario_main( void )
 {
+    typedef enum {
+        MODE_RECEIVER,
+        MODE_SENDER
+    } device_mode_t;
+
+    device_mode_t mode;
+
+    if (HAL_GPIO_ReadPin(IN_SENDER_GPIO_Port, IN_SENDER_Pin) == GPIO_PIN_SET) {
+        mode = MODE_SENDER;
+        printf("Starting as Sender!\r\n");
+    } else {
+        mode = MODE_RECEIVER;
+        printf("Starting as Receiver!\r\n");
+
+    }
+
     ModulationParams_t modulationParams;
 
     HwInit( );
@@ -163,24 +178,7 @@ int dario_main( void )
     printf( "\n\n\r     SX1280 Ping Pong Demo Application. %s\n\n\r", FIRMWARE_VERSION );
     printf( "\n\n\r     Radio firmware version 0x%x\n\n\r", Radio.GetFirmwareVersion( ) );
 
-#if defined( MODE_GFSK )
-
-    printf( "\nPing Pong running in GFSK mode\n\r" );
-    modulationParams.PacketType = PACKET_TYPE_GFSK;
-    modulationParams.Params.Gfsk.BitrateBandwidth = GFSK_BLE_BR_0_125_BW_0_3;
-    modulationParams.Params.Gfsk.ModulationIndex = GFSK_BLE_MOD_IND_1_00;
-    modulationParams.Params.Gfsk.ModulationShaping = RADIO_MOD_SHAPING_BT_1_0;
-
-    packetParams.PacketType = PACKET_TYPE_GFSK;
-    packetParams.Params.Gfsk.PreambleLength = PREAMBLE_LENGTH_32_BITS;
-    packetParams.Params.Gfsk.SyncWordLength = GFSK_SYNCWORD_LENGTH_5_BYTE;
-    packetParams.Params.Gfsk.SyncWordMatch = RADIO_RX_MATCH_SYNCWORD_1;
-    packetParams.Params.Gfsk.HeaderType = RADIO_PACKET_VARIABLE_LENGTH;
-    packetParams.Params.Gfsk.PayloadLength = BUFFER_SIZE;
-    packetParams.Params.Gfsk.CrcLength = RADIO_CRC_3_BYTES;
-    packetParams.Params.Gfsk.Whitening = RADIO_WHITENING_ON;
-
-#elif defined( MODE_LORA )
+#if defined( MODE_LORA )
 
     printf( "\nPing Pong running in LORA mode\n\r" );
     modulationParams.PacketType = PACKET_TYPE_LORA;
@@ -215,8 +213,6 @@ int dario_main( void )
     packetParams.Params.Flrc.CrcLength = RADIO_CRC_3_BYTES;
     packetParams.Params.Flrc.Whitening = RADIO_WHITENING_OFF;
 
-#else
-#error "Please select the mode of operation for the Ping Ping demo"
 #endif
 
     Radio.SetStandby( STDBY_RC );
@@ -227,47 +223,103 @@ int dario_main( void )
     Radio.SetBufferBaseAddresses( 0x00, 0x00 );
     Radio.SetTxParams( TX_OUTPUT_POWER, RADIO_RAMP_02_US );
     
-    Radio.SetDioIrqParams( RxIrqMask, RxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
-
     AppState = APP_LOWPOWER;
 
-    Radio.SetDioIrqParams( RxIrqMask, RxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
-    Radio.SetRx( (TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
+    if (mode == MODE_SENDER) {
 
-    int8_t rssi = 0;
+        Radio.SetDioIrqParams( TxIrqMask, TxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
 
+        uint32_t txCounter = 0;
 
-    while (1)
-    {
-        SX1280ProcessIrqs();
+        // Prepare first packet
+        memset(Buffer, 0, BufferSize);
+        memcpy(Buffer, &txCounter, sizeof(txCounter));
+        txCounter++;
 
-        if(AppState == APP_RX)
+        // Record start time
+        txStartTime = HAL_GetTick();
+
+        Radio.SendPayload(Buffer, BufferSize, (TickTime_t){ TX_TIMEOUT_VALUE });
+
+        while (1)
         {
-            AppState = APP_LOWPOWER; 
+            SX1280ProcessIrqs();
 
-            Radio.GetPayload(Buffer, &BufferSize, BUFFER_SIZE);
-            rssi = Radio.GetRssiInst();
+            printf("AppState: %i\r\n", AppState);
 
-            printf(modeString);
-            
-            printf("RX (%d bytes): ", BufferSize);
-            for(int i=0; i<BufferSize; i++) {
-                printf("%02X ", Buffer[i]);
+            if(AppState == APP_TX)
+            {
+                // TX finished, measure time
+                AppState = APP_LOWPOWER;
+                txEndTime = HAL_GetTick();
+
+                printf("TX time: %lu ms\r\n", txEndTime - txStartTime);
+
+                // Prepare next packet
+                memset(Buffer, 0, BufferSize);
+                memcpy(Buffer, &txCounter, sizeof(txCounter));
+                if (txCounter == UINT32_MAX)
+                    txCounter = 0;
+                else
+                    txCounter++;
+
+                // Record start time for next TX
+                txStartTime = HAL_GetTick();
+
+                // Send next packet
+                Radio.SendPayload(Buffer, BufferSize, (TickTime_t){ TX_TIMEOUT_VALUE }); 
+            } 
+            else if(AppState == APP_TX_TIMEOUT)
+            {
+                AppState = APP_LOWPOWER;
+                printf("Sender Timeout occurred!\r\n");
+
+                txStartTime = HAL_GetTick();
+                Radio.SendPayload(Buffer, BufferSize, (TickTime_t){ TX_TIMEOUT_VALUE });
             }
-            printf(" With RSSI: %i", rssi);
-            printf("\r\n");
-            
-            Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+            // HAL_Delay(100);
         }
-        else if(AppState == APP_RX_TIMEOUT || AppState == APP_RX_ERROR)
+
+    } else if (mode == MODE_RECEIVER) {
+        
+        Radio.SetDioIrqParams( RxIrqMask, RxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
+        Radio.SetRx( (TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE } );
+
+        int8_t rssi = 0;
+        
+
+        while (1)
         {
-            AppState = APP_LOWPOWER;
-            printf("Error or timeout occured!\r\n");
-            // Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+            SX1280ProcessIrqs();
+            
+            if(AppState == APP_RX)
+            {
+                AppState = APP_LOWPOWER; 
+
+                Radio.GetPayload(Buffer, &BufferSize, BUFFER_SIZE);
+                rssi = Radio.GetRssiInst();
+
+                printf(modeString);
+                
+                printf("RX (%d bytes): ", BufferSize);
+                for(int i=0; i<BufferSize; i++) {
+                    printf("%02X ", Buffer[i]);
+                }
+                printf(" With RSSI: %i", rssi);
+                printf("\r\n");
+                
+                Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+            }
+            else if(AppState == APP_RX_TIMEOUT || AppState == APP_RX_ERROR)
+            {
+                AppState = APP_LOWPOWER;
+                printf("Error or timeout occured!\r\n");
+            }
+            HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin);
+            HAL_Delay(100);
         }
-        HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin);
-        HAL_Delay(100);
-    }
+    }   
+
 }
 
 void OnTxDone( void )
@@ -284,6 +336,7 @@ void OnTxTimeout( void )
 {
     AppState = APP_TX_TIMEOUT;
     printf( "<>>>>>>>>TXE\n\r" ); 
+    // Radio.SetTx( ( TickTime_t ) { TX_TIMEOUT_VALUE } );
 }
 
 void OnRxTimeout( void )

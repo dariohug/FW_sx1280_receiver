@@ -80,6 +80,8 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define IN_SENDER_Pin GPIO_PIN_11
+#define IN_SENDER_GPIO_Port GPIOC
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
 #define RADIO_RESET_Pin GPIO_PIN_5

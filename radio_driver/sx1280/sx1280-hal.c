@@ -124,7 +124,7 @@ void SX1280HalWaitOnBusy( void )
     while( HAL_GPIO_ReadPin( RADIO_BUSY_GPIO_Port, RADIO_BUSY_Pin ) == 1 ){
         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 1); 
     }
-        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0); 
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, 0); 
 }
 
 void SX1280HalInit( DioIrqHandler **irqHandlers )

@@ -7,7 +7,7 @@ from datetime import datetime
 # ---------------- CONFIG ----------------
 PORT = "/dev/ttyACM0"
 BAUD = 115200
-DURATION = 30   # 5 minutes
+DURATION = 60   # 5 minutes
 
 distance = input("Enter measurement distance (meters): ")
 
