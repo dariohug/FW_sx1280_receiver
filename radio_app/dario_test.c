@@ -16,9 +16,9 @@
 /*!const char *, ...
  * Select mode of operation for the Ping Ping application
  */
-#define MODE_LORA
+// #define MODE_LORA
 //#define MODE_GFSK
-//#define MODE_FLRC
+#define MODE_FLRC
 
 #define RF_BL_ADV_CHANNEL_38             			2426000000 // Hz
 #define RF_BL_ADV_CHANNEL_0                     	2404000000 // Hz
@@ -38,12 +38,12 @@
 /*!
  * \brief Defines the buffer size, i.e. the payload size
  */
-#define BUFFER_SIZE                                 20
+#define BUFFER_SIZE                                 64
 
 /*!
  * \brief Number of tick size steps for tx timeout
  */
-#define TX_TIMEOUT_VALUE                            10000 // ms
+#define TX_TIMEOUT_VALUE                            0xFFFF // ms
 
 /*!
  * \brief Number of tick size steps for rx timeout
@@ -202,6 +202,7 @@ int dario_main( void )
     modulationParams.Params.Flrc.BitrateBandwidth = FLRC_BR_0_260_BW_0_3;
     modulationParams.Params.Flrc.CodingRate = FLRC_CR_1_2;
     modulationParams.Params.Flrc.ModulationShaping = RADIO_MOD_SHAPING_BT_1_0;
+    // Results in roughly 130 kb/s in Bit Rate
 
     packetParams.PacketType = PACKET_TYPE_FLRC;
     packetParams.Params.Flrc.PreambleLength = PREAMBLE_LENGTH_32_BITS;
@@ -276,7 +277,7 @@ int dario_main( void )
                 txStartTime = HAL_GetTick();
                 Radio.SendPayload(Buffer, BufferSize, (TickTime_t){ TX_TIMEOUT_VALUE });
             }
-            HAL_Delay(10);
+            HAL_Delay(5);
         }
 
     } else if (mode == MODE_RECEIVER) {
@@ -287,6 +288,7 @@ int dario_main( void )
         int8_t rssi = 0;
         uint32_t rxStartTime = HAL_GetTick();  // Record start time for RX timing
         uint32_t rxEndTime = 0;
+        uint32_t counter;
 
         while(1)
         {
@@ -295,24 +297,20 @@ int dario_main( void )
             switch(AppState)
             {
                 case APP_RX:
-                    rxEndTime = HAL_GetTick();  // Capture end time
+                {
                     Radio.GetPayload(Buffer, &BufferSize, BUFFER_SIZE);
-                    rssi = Radio.GetRssiInst();
-                    
-                    printf("DARIO: Received buffer: ");
-                    // for (uint8_t i = 0; i < BufferSize; i++) {
-                    //     printf("%02X ", Buffer[i]);
-                    // }
-                    printf(" With RSSI: %i", rssi);
-                    printf(" | RX time: %lu ms\r\n", rxEndTime - rxStartTime);
 
-                    // Prepare for next RX
-                    // Radio.SetRx((TickTime_t){ RX_TIMEOUT_TICK_SIZE, RX_TIMEOUT_VALUE });
+                    PacketStatus_t pktStatus;
+                    Radio.GetPacketStatus(&pktStatus);
+                    int8_t rssi = pktStatus.Params.Flrc.RssiSync;
+
+                    memcpy(&counter, Buffer, sizeof(counter));
+
+                    printf("R,%lu,%d\n", counter, rssi);
+
                     AppState = APP_LOWPOWER;
-
-                    // Start timing for next packet
-                    rxStartTime = HAL_GetTick();
                     break;
+                }
 
                 case APP_RX_TIMEOUT:
                     rxEndTime = HAL_GetTick();
@@ -337,7 +335,7 @@ int dario_main( void )
                 default:
                     break;
             }
-            HAL_Delay(8);
+            HAL_Delay(5);
         } 
     }
 }

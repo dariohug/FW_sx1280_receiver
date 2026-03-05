@@ -1,22 +1,19 @@
 import serial
 import csv
-import re
 import time
 from datetime import datetime
+
+# Disclaimer: Some AI was used for this testfile 
 
 # ---------------- CONFIG ----------------
 PORT = "/dev/ttyACM0"
 BAUD = 115200
-DURATION = 60   # 5 minutes
+DURATION = 10
 
 distance = input("Enter measurement distance (meters): ")
 
 RAW_FILE = f"radio_raw_{distance}.csv"
 SUMMARY_FILE = "radio_summary.csv"
-
-pattern = re.compile(
-    r"Mode:\s*(\w+).*RX\s*\((\d+)\s*bytes\):\s*((?:[0-9A-F]{2}\s+)+).*RSSI:\s*(-?\d+)"
-)
 
 ser = serial.Serial(PORT, BAUD, timeout=1)
 
@@ -25,8 +22,8 @@ start_time = time.time()
 received_packets = 0
 packet_numbers = []
 rssi_values = []
-payload_bytes = 0
-mode_value = "UNKNOWN"
+payload_bytes = 64  # 32-bit counter
+mode_value = "FLRC"
 
 # ---------------- RAW CSV ----------------
 with open(RAW_FILE, "w", newline="") as raw_file:
@@ -34,7 +31,6 @@ with open(RAW_FILE, "w", newline="") as raw_file:
     raw_writer = csv.writer(raw_file)
     raw_writer.writerow([
         "timestamp",
-        "mode",
         "packet_counter",
         "rssi",
         "distance"
@@ -43,59 +39,48 @@ with open(RAW_FILE, "w", newline="") as raw_file:
     while time.time() - start_time < DURATION:
 
         line = ser.readline().decode(errors="ignore").strip()
-        if not line:
+
+        if not line.startswith("R,"):
             continue
 
-        match = pattern.search(line)
-        if not match:
+        try:
+            _, counter, rssi = line.split(",")
+            counter = int(counter)
+            rssi = int(rssi)
+        except:
             continue
-
-        mode_value = match.group(1)
-        payload_bytes = int(match.group(2))
-        payload = match.group(3).strip()
-        rssi = int(match.group(4))
-
-        bytes_list = payload.split()
-
-        if len(bytes_list) < 2:
-            continue
-
-        # little-endian 16-bit counter
-        packet_counter = int(bytes_list[0], 16) | (int(bytes_list[1], 16) << 8)
 
         now = datetime.now()
 
         raw_writer.writerow([
             now,
-            mode_value,
-            packet_counter,
+            counter,
             rssi,
             distance
         ])
 
         received_packets += 1
-        packet_numbers.append(packet_counter)
+        packet_numbers.append(counter)
         rssi_values.append(rssi)
 
-        print(f"Packet: {packet_counter}   RSSI: {rssi}      ", end="\r", flush=True)
+        print(f"Pkt: {counter}  RSSI: {rssi}", end="\r", flush=True)
 
-print("Measurement finished")
+print("\nMeasurement finished")
 
 if received_packets == 0:
     print("No packets received")
     exit()
 
-# ---------------- HANDLE COUNTER OVERFLOW ----------------
-first = packet_numbers[0]
-last = packet_numbers[-1]
+# expected_packets = int(packet_numbers[-1]) - int(packet_numbers[0]) + 1
 
-if last >= first:
-    expected_packets = last - first + 1
-else:
-    # overflow case
-    expected_packets = (65536 - first) + last + 1
+expected_packets = DURATION * (1000 / 6.3)
 
 packet_loss = 100 * (1 - (received_packets / expected_packets))
+
+print(received_packets)
+print(expected_packets)
+
+
 
 # ---------------- RSSI stats ----------------
 rssi_min = min(rssi_values)
@@ -139,4 +124,13 @@ with open(SUMMARY_FILE, "a", newline="") as summary_file:
         received_packets
     ])
 
-print("Summary written")
+print("\n" + "=" * 45)
+print("            RADIO LINK SUMMARY")
+print("=" * 45)
+print(f"Distance:            {distance} m")
+print(f"Received packets:    {received_packets}")
+print(f"Packet loss:         {packet_loss:.2f} %")
+print(f"Mean RSSI:           {rssi_avg:.2f} dBm")
+print(f"RSSI min / max:      {rssi_min} / {rssi_max} dBm")
+print(f"Effective rate:      {data_rate:.2f} bit/s")
+print("=" * 45)
